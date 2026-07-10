@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>메신저 - 스마트 일정봇</title>
+<style>
+    :root {
+        --primary: #2563EB;
+        --primary-hover: #1D4ED8;
+        --bg: #F8FAFC;
+        --card-bg: #FFFFFF;
+        --text-main: #0F172A;
+        --text-sub: #64748B;
+        --success: #10B981;
+        --danger: #EF4444;
+        --warning: #F59E0B;
+        --border: #E2E8F0;
+        --chat-bg: #EDF1F7;
+        --bot-bubble: #FFFFFF;
+        --user-bubble: #2563EB;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+        background-color: var(--bg);
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+    }
+
+    .phone {
+        width: 100%;
+        max-width: 420px;
+        height: 780px;
+        background: var(--chat-bg);
+        border-radius: 28px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        border: 8px solid #1E293B;
+    }
+
+    /* 상단 안내 배너 (인터뷰용 설명) */
+    .demo-banner {
+        background: #111827;
+        color: #E2E8F0;
+        font-size: 0.7rem;
+        text-align: center;
+        padding: 6px 12px;
+        line-height: 1.4;
+    }
+    .demo-banner b { color: #FBBF24; }
+
+    /* 모드 토글 */
+    .mode-toggle {
+        display: flex;
+        gap: 6px;
+        padding: 10px 12px;
+        background: #fff;
+        border-bottom: 1px solid var(--border);
+    }
+    .mode-btn {
+        flex: 1;
+        border: 1px solid var(--border);
+        background: #F8FAFC;
+        color: var(--text-sub);
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 8px 6px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: 0.15s;
+    }
+    .mode-btn.active {
+        background: #EEF2FF;
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    /* 채팅 헤더 */
+    .chat-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        background: #fff;
+        border-bottom: 1px solid var(--border);
+    }
+    .bot-avatar {
+        width: 38px; height: 38px; border-radius: 50%;
+        background: var(--primary); color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem; flex-shrink: 0;
+    }
+    .chat-header-info h2 { margin: 0; font-size: 0.95rem; font-weight: 700; }
+    .chat-header-info p { margin: 2px 0 0; font-size: 0.72rem; color: var(--text-sub); }
+
+    /* 채팅 바디 */
+    .chat-body {
+        flex: 1;
+        padding: 16px 12px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .row { display: flex; gap: 8px; align-items: flex-end; }
+    .row.bot { justify-content: flex-start; }
+    .row.user { justify-content: flex-end; }
+
+    .mini-avatar {
+        width: 26px; height: 26px; border-radius: 50%;
+        background: var(--primary); color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.75rem; flex-shrink: 0;
+    }
+
+    .bubble {
+        max-width: 78%;
+        padding: 10px 13px;
+        border-radius: 14px;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        animation: pop 0.25s ease-out;
+    }
+    .bubble.bot { background: var(--bot-bubble); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+    .bubble.user { background: var(--user-bubble); color: #fff; border-bottom-right-radius: 4px; }
+    .bubble.system {
+        margin: 4px auto; text-align: center; background: transparent;
+        color: var(--text-sub); font-size: 0.72rem; max-width: 90%;
+    }
+
+    @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+    .timestamp { font-size: 0.65rem; color: var(--text-sub); margin: 0 4px; align-self: flex-end; white-space: nowrap; }
+
+    /* 요청 카드 (봇 메시지 안) */
+    .req-card {
+        background: var(--bot-bubble);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        border-bottom-left-radius: 4px;
+        padding: 14px;
+        max-width: 84%;
+    }
+    .req-card .tag {
+        display: inline-block; font-size: 0.68rem; font-weight: 700;
+        background: #EEF2FF; color: var(--primary);
+        padding: 3px 8px; border-radius: 10px; margin-bottom: 8px;
+    }
+    .req-card h3 { margin: 0 0 6px; font-size: 0.95rem; }
+    .req-card .meta { font-size: 0.78rem; color: var(--text-sub); margin: 2px 0; }
+    .req-card .meta b { color: var(--text-main); }
+
+    .req-timer {
+        margin-top: 10px;
+        font-size: 0.72rem;
+        color: var(--warning);
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .req-buttons { display: flex; gap: 8px; margin-top: 12px; }
+    .req-buttons button {
+        flex: 1;
+        padding: 10px 6px;
+        border-radius: 10px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        transition: 0.15s;
+    }
+    .btn-accept { background: var(--success); color: #fff; }
+    .btn-accept:hover { background: #0ea371; }
+    .btn-reject { background: #FEE2E2; color: var(--danger); }
+    .btn-reject:hover { background: #fecaca; }
+    .req-buttons button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .speed-badge {
+        display: inline-flex; align-items: center; gap: 3px;
+        font-size: 0.68rem; font-weight: 700;
+        background: rgba(255,255,255,0.2); color: #fff;
+        padding: 2px 7px; border-radius: 8px; margin-top: 6px;
+    }
+
+    /* 타이핑 인디케이터 */
+    .typing { display: flex; gap: 4px; padding: 12px 14px; background: var(--bot-bubble); border: 1px solid var(--border); border-radius: 14px; border-bottom-left-radius: 4px; width: fit-content; }
+    .typing span { width: 6px; height: 6px; background: var(--text-sub); border-radius: 50%; animation: blink 1.2s infinite ease-in-out; }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+    .chat-footer {
+        padding: 10px 14px 14px;
+        background: #fff;
+        border-top: 1px solid var(--border);
+        text-align: center;
+    }
+    .reset-btn {
+        background: none; border: 1px solid var(--border);
+        color: var(--text-sub); font-size: 0.78rem; font-weight: 600;
+        padding: 8px 16px; border-radius: 20px; cursor: pointer;
+    }
+    .reset-btn:hover { border-color: var(--primary); color: var(--primary); }
+</style>
+</head>
+<body>
+
+<div class="phone">
+    <div class="demo-banner">
+        이 화면은 <b>참석자</b>가 실제로 받는 메신저 알림 화면입니다. (주최자 대시보드는 별도 페이지)
+    </div>
+
+    <div class="mode-toggle">
+        <button class="mode-btn active" id="mode-required" onclick="setMode('required')">👤 필수 참석자로 보기</button>
+        <button class="mode-btn" id="mode-optional" onclick="setMode('optional')">🙋 선택 참석자로 보기</button>
+    </div>
+
+    <div class="chat-header">
+        <div class="bot-avatar">🤖</div>
+        <div class="chat-header-info">
+            <h2>스마트 일정봇</h2>
+            <p id="chat-header-sub">이개발님 · 필수 참석자</p>
+        </div>
+    </div>
+
+    <div class="chat-body" id="chat-body"></div>
+
+    <div class="chat-footer">
+        <button class="reset-btn" onclick="resetChat()">🔄 처음부터 다시 보기</button>
+    </div>
+</div>
+
+<script>
+    const rankInfo = {
+        1: { day: '화요일', time: '오후 3:00 - 4:00', label: '1순위' },
+        2: { day: '수요일', time: '오전 10:00 - 11:00', label: '2순위' },
+        3: { day: '목요일', time: '오후 1:00 - 2:00', label: '3순위' }
+    };
+
+    let mode = 'required';       // 'required' | 'optional'
+    let currentRank = 1;
+    let waitTimerInt = null;
+    let waitSeconds = 0;
+    let autoAcceptTimeout = null;
+    let responded = false;
+
+    const AUTO_ACCEPT_AFTER = 9; // 선택 참석자 무응답 자동수락까지 대기(초) - 데모용으로 30분을 압축
+
+    function setMode(m) {
+        mode = m;
+        document.getElementById('mode-required').classList.toggle('active', m === 'required');
+        document.getElementById('mode-optional').classList.toggle('active', m === 'optional');
+        document.getElementById('chat-header-sub').innerText =
+            m === 'required' ? '이개발님 · 필수 참석자' : '최디잔님 · 선택 참석자';
+        resetChat();
+    }
+
+    function nowTime() {
+        const d = new Date();
+        const h = d.getHours().toString().padStart(2, '0');
+        const m = d.getMinutes().toString().padStart(2, '0');
+        return `${h}:${m}`;
+    }
+
+    function scrollToBottom() {
+        const body = document.getElementById('chat-body');
+        body.scrollTop = body.scrollHeight;
+    }
+
+    function addSystemLine(text) {
+        const body = document.getElementById('chat-body');
+        const div = document.createElement('div');
+        div.className = 'bubble system';
+        div.innerText = text;
+        body.appendChild(div);
+        scrollToBottom();
+    }
+
+    function addUserBubble(text, speedSeconds) {
+        const body = document.getElementById('chat-body');
+        const row = document.createElement('div');
+        row.className = 'row user';
+        row.innerHTML = `
+            <span class="timestamp">${nowTime()}</span>
+            <div class="bubble user">
+                ${text}
+                ${speedSeconds !== undefined ? `<div class="speed-badge">⚡ ${speedSeconds}초 만에 응답</div>` : ''}
+            </div>
+        `;
+        body.appendChild(row);
+        scrollToBottom();
+    }
+
+    function addBotTyping(callback, delay = 1100) {
+        const body = document.getElementById('chat-body');
+        const row = document.createElement('div');
+        row.className = 'row bot';
+        row.id = 'typing-row';
+        row.innerHTML = `<div class="mini-avatar">🤖</div><div class="typing"><span></span><span></span><span></span></div>`;
+        body.appendChild(row);
+        scrollToBottom();
+        setTimeout(() => {
+            const t = document.getElementById('typing-row');
+            if (t) t.remove();
+            callback();
+        }, delay);
+    }
+
+    function addBotBubble(text) {
+        const body = document.getElementById('chat-body');
+        const row = document.createElement('div');
+        row.className = 'row bot';
+        row.innerHTML = `
+            <div class="mini-avatar">🤖</div>
+            <div class="bubble bot">${text}</div>
+            <span class="timestamp">${nowTime()}</span>
+        `;
+        body.appendChild(row);
+        scrollToBottom();
+    }
+
+    function renderRequestCard(rank) {
+        const info = rankInfo[rank];
+        const body = document.getElementById('chat-body');
+        const row = document.createElement('div');
+        row.className = 'row bot';
+        row.id = 'active-card-row';
+        row.innerHTML = `
+            <div class="mini-avatar">🤖</div>
+            <div class="req-card" id="active-card">
+                <span class="tag">${info.label} 후보 · 가승인 요청</span>
+                <h3>차기 프로젝트 킥오프 (Kick-off)</h3>
+                <p class="meta">🗓️ <b>${info.day} ${info.time}</b></p>
+                <p class="meta">👥 김팀장, 이개발, 박기획 외 2명</p>
+                <p class="meta">이 시간에 참석 가능하신가요?</p>
+                <div class="req-timer" id="req-timer">⏱ 대기 중 · 00초</div>
+                <div class="req-buttons">
+                    <button class="btn-accept" id="btn-accept" onclick="respond(true)">🙆‍♂️ 네, 괜찮아요</button>
+                    <button class="btn-reject" id="btn-reject" onclick="respond(false)">📅 숨은 일정 있어요</button>
+                </div>
+            </div>
+        `;
+        body.appendChild(row);
+        scrollToBottom();
+        startWaitTimer();
+    }
+
+    function startWaitTimer() {
+        waitSeconds = 0;
+        responded = false;
+        clearInterval(waitTimerInt);
+        clearTimeout(autoAcceptTimeout);
+
+        waitTimerInt = setInterval(() => {
+            waitSeconds += 1;
+            const el = document.getElementById('req-timer');
+            if (el) el.innerText = `⏱ 대기 중 · ${String(waitSeconds).padStart(2, '0')}초`;
+        }, 1000);
+
+        // 선택 참석자는 일정 시간 무응답 시 자동 수락 처리 (30분 타임아웃을 데모용으로 압축)
+        if (mode === 'optional') {
+            autoAcceptTimeout = setTimeout(() => {
+                if (!responded) handleAutoAccept();
+            }, AUTO_ACCEPT_AFTER * 1000);
+        }
+    }
+
+    function disableCardButtons() {
+        const a = document.getElementById('btn-accept');
+        const r = document.getElementById('btn-reject');
+        if (a) a.disabled = true;
+        if (r) r.disabled = true;
+    }
+
+    function respond(accepted) {
+        if (responded) return;
+        responded = true;
+        clearInterval(waitTimerInt);
+        clearTimeout(autoAcceptTimeout);
+        disableCardButtons();
+
+        const elapsed = waitSeconds || 1;
+        const info = rankInfo[currentRank];
+
+        if (accepted) {
+            addUserBubble('🙆‍♂️ 네, 괜찮아요', elapsed);
+            addBotTyping(() => {
+                addBotBubble(`✅ 응답이 저장되었습니다. <b>${info.day} ${info.time}</b>으로 진행될 가능성이 높아요! 주최자에게 즉시 전달할게요.`);
+                addSystemLine('📤 주최자 대시보드에 실시간 반영됨');
+                addBotTyping(() => {
+                    addBotBubble('🎉 다른 참석자들의 응답도 모두 모이면 최종 확정 알림을 보내드릴게요. 감사합니다!');
+                }, 900);
+            }, 900);
+        } else {
+            addUserBubble('📅 숨은 일정이 있어요', elapsed);
+            addBotTyping(() => {
+                addBotBubble(`🚨 알겠습니다! <b>${info.day} ${info.time}</b>은 어려우시군요. 다른 후보 시간을 확인해볼게요...`);
+                addSystemLine('📤 주최자 대시보드에 "거절" 처리됨 → 자동 재조율 시작');
+
+                if (currentRank < 3) {
+                    addBotTyping(() => {
+                        currentRank += 1;
+                        addBotBubble(`🔄 대체 후보를 찾았어요. 이번 시간은 어떠세요?`);
+                        renderRequestCard(currentRank);
+                    }, 1300);
+                } else {
+                    addBotTyping(() => {
+                        addBotBubble('😥 준비된 후보 시간이 모두 어려우시네요. 주최자에게 별도로 안내드릴게요. 협조 감사합니다!');
+                    }, 1100);
+                }
+            }, 900);
+        }
+    }
+
+    function handleAutoAccept() {
+        if (responded) return;
+        responded = true;
+        clearInterval(waitTimerInt);
+        disableCardButtons();
+
+        const info = rankInfo[currentRank];
+        const el = document.getElementById('req-timer');
+        if (el) el.innerText = '⏱ 응답 시간 초과';
+
+        addSystemLine('⏰ 30분 경과 (데모 압축) · 캘린더가 비어있어 무응답 자동 수락 처리');
+        addBotTyping(() => {
+            addBotBubble(`✅ 별도 응답이 없어 캘린더 기준으로 <b>자동 수락</b> 처리했어요. <b>${info.day} ${info.time}</b>에 참석 예정으로 등록됩니다.`);
+            addSystemLine('📤 주최자 대시보드에 "무응답 자동수락"으로 반영됨');
+        }, 900);
+    }
+
+    function resetChat() {
+        clearInterval(waitTimerInt);
+        clearTimeout(autoAcceptTimeout);
+        currentRank = 1;
+        responded = false;
+        waitSeconds = 0;
+        document.getElementById('chat-body').innerHTML = '';
+
+        addSystemLine('오늘 ' + nowTime());
+        addBotTyping(() => {
+            addBotBubble('안녕하세요! 새 회의 일정 조율 요청이 도착했어요 👋');
+            addBotTyping(() => {
+                renderRequestCard(currentRank);
+            }, 700);
+        }, 500);
+    }
+
+    // 초기 진입
+    resetChat();
+</script>
+</body>
+</html>

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트 회의 조율 (Auto-Escalation)</title>
+    <style>
+        :root {
+            --primary: #2563EB;
+            --primary-hover: #1D4ED8;
+            --bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --text-main: #0F172A;
+            --text-sub: #64748B;
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --border: #E2E8F0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            position: relative;
+            min-height: 650px;
+        }
+
+        .header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            background: #fff;
+        }
+
+        .header h1 { margin: 0; font-size: 1.25rem; font-weight: 700; transition: 0.2s; }
+        .header .header-sub { font-size: 0.75rem; color: var(--primary); font-weight: 600; margin-top: 4px; display: none; }
+        .header .header-sub.show { display: block; }
+
+        .content { padding: 24px; }
+
+        .btn {
+            display: block; width: 100%; padding: 14px;
+            background-color: var(--primary); color: white;
+            border: none; border-radius: 8px; font-size: 1rem;
+            font-weight: 600; cursor: pointer; transition: 0.2s;
+            margin-top: 24px;
+        }
+        .btn:hover { background-color: var(--primary-hover); }
+        .btn:disabled { background-color: #94A3B8; cursor: not-allowed; }
+
+        .section { display: none; animation: fadeIn 0.4s ease-in-out; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Step 1: 폼 디자인 */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px; color: var(--text-sub); }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box; }
+        
+        .attendee-list { list-style: none; padding: 0; margin: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .attendee-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--border); }
+        .attendee-item:last-child { border-bottom: none; }
+        .attendee-info { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+        .badge-role { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; background: #EEF2FF; color: var(--primary); font-weight: 600; cursor: pointer; border: 1px solid transparent; user-select: none; transition: 0.15s; }
+        .badge-role:hover { border-color: var(--primary); }
+        .badge-role.optional { background: #F1F5F9; color: var(--text-sub); }
+        .badge-role.optional:hover { border-color: var(--text-sub); }
+
+        /* Step 2: 카드 UI */
+        p.step2-desc { font-size: 0.875rem; color: var(--text-sub); margin-bottom: 16px; }
+        .card { border: 2px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; cursor: pointer; transition: 0.2s; position: relative; }
+        .card:hover { border-color: var(--primary); }
+        .card.selected { border-color: var(--primary); background: #F0FDF4; }
+        .card.selected::after {
+            content: "✓ 선택됨";
+            position: absolute; top: -10px; right: 14px;
+            background: var(--primary); color: #fff;
+            font-size: 0.7rem; font-weight: 700;
+            padding: 3px 8px; border-radius: 10px;
+        }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .card-title { font-weight: 700; font-size: 1.1rem; }
+        .rank-badge { font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; background: var(--text-main); color: white; }
+
+        /* Step 3: 라이브 대시보드 (시뮬레이션) */
+        .live-status-box { background: #F8FAFC; border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+        .system-log { font-size: 0.875rem; color: var(--text-sub); margin-bottom: 16px; min-height: 40px; font-weight: 600; text-align: center; color: var(--primary); transition: 0.2s; }
+        
+        .status-list { list-style: none; padding: 0; margin: 0; }
+        .status-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+        .status-item:last-child { border-bottom: none; }
+        
+        .status-badge { font-size: 0.8rem; padding: 4px 8px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+        .status-waiting { background: #FEF3C7; color: #B45309; }
+        .status-accept { background: #D1FAE5; color: var(--success); }
+        .status-reject { background: #FEE2E2; color: var(--danger); }
+        .status-auto { background: #E0E7FF; color: var(--primary); } /* 무응답 자동수락 */
+
+        .loading-spinner { width: 30px; height: 30px; border: 3px solid #E2E8F0; border-top: 3px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .success-icon { font-size: 4rem; text-align: center; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1 id="header-title">1. 회의 기본 조건 설정</h1>
+        <div class="header-sub" id="header-sub"></div>
+    </div>
+
+    <div class="content">
+        <!-- STEP 1: 설정 -->
+        <div id="step1" class="section active">
+            <div class="form-group">
+                <label>회의 목적</label>
+                <input type="text" value="차기 프로젝트 킥오프 (Kick-off)">
+            </div>
+            
+            <div class="form-group">
+                <label>참석자 설정 <span style="font-weight:400; color: var(--text-sub);">(뱃지를 눌러 필수/선택을 바꿀 수 있어요)</span></label>
+                <ul class="attendee-list" id="attendee-list"></ul>
+            </div>
+            <button class="btn" onclick="goToStep2()">시스템 최적 시간 찾기</button>
+        </div>
+
+        <!-- STEP 2: 추천 시간 1차 선택 -->
+        <div id="step2" class="section">
+            <p class="step2-desc">캘린더 분석 완료. 아래 3개 후보 중 원하는 시간을 선택해 가승인 요청(Ping)을 보내세요.</p>
+
+            <div class="card selected" id="card1" onclick="selectCard(1)">
+                <div class="card-header"><span class="card-title">화요일 오후 3:00 - 4:00</span><span class="rank-badge">1순위</span></div>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--success); font-weight: 600;">필수 인원 100% 참석 가능 (캘린더 상)</p>
+            </div>
+            <div class="card" id="card2" onclick="selectCard(2)">
+                <div class="card-header"><span class="card-title">수요일 오전 10:00 - 11:00</span><span class="rank-badge">2순위</span></div>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-sub);">필수 100% 가능, 선택 인원(최디잔) 기피 시간</p>
+            </div>
+            <div class="card" id="card3" onclick="selectCard(3)">
+                <div class="card-header"><span class="card-title">목요일 오후 1:00 - 2:00</span><span class="rank-badge">3순위</span></div>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-sub);">필수 100% 가능, 전체 참석률은 다소 낮음</p>
+            </div>
+
+            <button class="btn" id="start-btn" onclick="startSimulation()">1순위 시간으로 Ping 발송 (대시보드 시작)</button>
+        </div>
+
+        <!-- STEP 3: 라이브 조율 현황 대시보드 (자동 에스컬레이션 시뮬레이션) -->
+        <div id="step3" class="section">
+            <div class="loading-spinner" id="sim-spinner"></div>
+            <h3 style="text-align: center; margin-top:0;" id="sim-title">가승인 핑(Ping) 발송 완료</h3>
+            <p style="text-align: center; font-size: 0.875rem; margin-bottom: 20px;" id="sim-subtitle">대상 시간: <b>화요일 오후 3:00</b></p>
+            
+            <div class="live-status-box">
+                <div class="system-log" id="system-log">참석자들의 응답을 대기 중입니다...</div>
+                <ul class="status-list" id="status-list"></ul>
+            </div>
+        </div>
+
+        <!-- STEP 4: 최종 완료 -->
+        <div id="step4" class="section">
+            <div class="success-icon">🎉</div>
+            <h2 style="text-align: center; margin-bottom: 8px;">일정 확정 완료!</h2>
+            <div class="live-status-box" style="text-align: center;">
+                <p style="margin: 0; color: var(--text-sub);">최종 확정 시간</p>
+                <h3 style="margin: 8px 0; color: var(--primary);" id="final-time">수요일 오전 10:00 - 11:00</h3>
+                <p style="margin: 0; font-size: 0.875rem; color: var(--text-sub);">참석자 캘린더에 자동 등록되었습니다.</p>
+            </div>
+            <button class="btn" style="background: white; color: var(--text-main); border: 1px solid var(--border);" onclick="location.reload()">처음부터 다시 시뮬레이션</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 순위별 시간 정보
+    const rankInfo = {
+        1: { day: '화요일', time: '오후 3:00 - 4:00', label: '1순위' },
+        2: { day: '수요일', time: '오전 10:00 - 11:00', label: '2순위' },
+        3: { day: '목요일', time: '오후 1:00 - 2:00', label: '3순위' }
+    };
+
+    let selectedRank = 1;      // Step2에서 선택된 카드
+    let countdownTimer = null; // 대기 시간 카운트다운 인터벌
+
+    // 참석자 데이터 (주최자가 Step1에서 필수/선택을 직접 토글 가능)
+    const attendees = [
+        { id: 'kim',  name: '김팀장', role: 'required' },
+        { id: 'lee',  name: '이개발', role: 'required' },
+        { id: 'park', name: '박기획', role: 'required' },
+        { id: 'choi', name: '최디잔', role: 'optional' },
+        { id: 'jung', name: '정마케', role: 'optional' }
+    ];
+
+    function roleLabel(role) { return role === 'required' ? '필수 참석' : '선택 참석'; }
+    function roleShort(role) { return role === 'required' ? '필수' : '선택'; }
+
+    // 주최자가 뱃지를 클릭하면 필수 ↔ 선택 토글
+    function toggleRole(id) {
+        const person = attendees.find(a => a.id === id);
+        person.role = (person.role === 'required') ? 'optional' : 'required';
+        renderAttendeeList();
+    }
+
+    function renderAttendeeList() {
+        const ul = document.getElementById('attendee-list');
+        ul.innerHTML = attendees.map(a => `
+            <li class="attendee-item">
+                <div class="attendee-info">${a.name}</div>
+                <span class="badge-role ${a.role === 'optional' ? 'optional' : ''}" onclick="toggleRole('${a.id}')">
+                    ${roleLabel(a.role)}
+                </span>
+            </li>
+        `).join('');
+    }
+
+    // Step3 대시보드의 참석자 상태 리스트를 현재 필수/선택 설정에 맞춰 생성
+    function renderStatusList() {
+        const ul = document.getElementById('status-list');
+        ul.innerHTML = attendees.map(a => `
+            <li class="status-item">
+                <span>${a.name} (${roleShort(a.role)})</span>
+                <span class="status-badge status-waiting" id="s-${a.id}">⏳ 대기중 (29분)</span>
+            </li>
+        `).join('');
+    }
+
+    renderAttendeeList(); // 페이지 로드시 초기 렌더링
+
+    function showSection(id, title, subLabel) {
+        document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('header-title').innerText = title;
+
+        const sub = document.getElementById('header-sub');
+        if (subLabel) {
+            sub.innerText = subLabel;
+            sub.classList.add('show');
+        } else {
+            sub.classList.remove('show');
+        }
+    }
+
+    function goToStep2() { showSection('step2', '2. 시스템 추천 시간 브리핑'); }
+
+    function goToStep4(finalRank) {
+        clearInterval(countdownTimer);
+        const info = rankInfo[finalRank];
+        document.getElementById('final-time').innerText = `${info.day} ${info.time}`;
+        showSection('step4', '4. 결과 리포트');
+    }
+
+    // STEP 2: 카드 선택
+    function selectCard(rank) {
+        selectedRank = rank;
+        document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+        document.getElementById('card' + rank).classList.add('selected');
+        document.getElementById('start-btn').innerText =
+            `${rankInfo[rank].label} 시간으로 Ping 발송 (대시보드 시작)`;
+    }
+
+    // 대기중인 배지들의 남은 시간을 줄여서 카운트다운처럼 보이게 함
+    function tickCountdown() {
+        document.querySelectorAll('.status-waiting').forEach(el => {
+            const match = el.innerText.match(/\((\d+)분\)/);
+            if (match) {
+                const remain = Math.max(0, parseInt(match[1], 10) - 3);
+                el.innerText = `⏳ 대기중 (${remain}분)`;
+            }
+        });
+    }
+
+    function getRequiredIds() { return attendees.filter(a => a.role === 'required').map(a => a.id); }
+    function getOptionalIds() { return attendees.filter(a => a.role === 'optional').map(a => a.id); }
+    function nameOf(id) { return attendees.find(a => a.id === id).name; }
+    function namesOf(ids) { return ids.map(nameOf).join(', '); }
+
+    function acceptBadges(ids) {
+        ids.forEach(id => {
+            const el = document.getElementById('s-' + id);
+            el.className = "status-badge status-accept";
+            el.innerText = "✅ 수락";
+        });
+    }
+    function autoAcceptBadges(ids) {
+        ids.forEach(id => {
+            const el = document.getElementById('s-' + id);
+            el.className = "status-badge status-auto";
+            el.innerText = "✅ 무응답 (자동수락)";
+        });
+    }
+
+    // 시뮬레이션 핵심 로직 (시간의 흐름에 따른 상태 변화)
+    function startSimulation() {
+        const firstRank = selectedRank;
+        const firstInfo = rankInfo[firstRank];
+
+        showSection('step3', '3. 실시간 조율 대시보드');
+        document.getElementById('sim-spinner').style.display = 'block';
+        document.getElementById('sim-title').innerText = '가승인 핑(Ping) 발송 완료';
+        document.getElementById('sim-subtitle').innerHTML =
+            `대상 시간: <b>${firstInfo.day} ${firstInfo.time.split(' - ')[0]}</b>`;
+
+        const log = document.getElementById('system-log');
+        log.style.color = "var(--primary)";
+        log.innerText = "참석자들의 응답을 대기 중입니다...";
+        renderStatusList();
+
+        clearInterval(countdownTimer);
+        countdownTimer = setInterval(tickCountdown, 1000);
+
+        const requiredIds = getRequiredIds();
+        const hasNextRank = firstRank < 3;          // 더 낮은 순위 카드가 남아있는지
+        const canReject = requiredIds.length >= 2;   // 거절 시나리오를 보여주려면 필수 인원이 2명 이상 필요
+
+        if (hasNextRank && canReject) {
+            runEscalationScenario(firstRank);
+        } else {
+            runDirectSuccessScenario(firstRank);
+        }
+    }
+
+    // 필수 인원 중 한 명이 거절 -> 자동 재조율 -> 확정
+    function runEscalationScenario(firstRank) {
+        const nextRank = firstRank + 1;
+        const nextInfo = rankInfo[nextRank];
+        const log = document.getElementById('system-log');
+
+        const requiredIds = getRequiredIds();
+        const optionalIds = getOptionalIds();
+        const rejecterId = requiredIds[1];                          // 두 번째 필수 인원이 숨은 일정으로 거절
+        const immediateIds = requiredIds.filter(id => id !== rejecterId);
+
+        // 1. 초기 응답 (1.5초 후)
+        setTimeout(() => {
+            acceptBadges(immediateIds);
+            log.innerText = `${namesOf(immediateIds)}님이 즉시 수락했습니다.`;
+        }, 1500);
+
+        // 2. 필수 인원의 거절 발생 (3.5초 후)
+        setTimeout(() => {
+            const el = document.getElementById('s-' + rejecterId);
+            el.className = "status-badge status-reject";
+            el.innerText = "❌ 거절 (숨은 일정)";
+            log.style.color = "var(--danger)";
+            log.innerText = `🚨 필수인원(${nameOf(rejecterId)}) 숨은 일정 발견! 조율 실패.`;
+        }, 3500);
+
+        // 3. 자동 재조율 시작 (5.5초 후) - 다음 순위 시간으로 전환
+        setTimeout(() => {
+            log.style.color = "var(--primary)";
+            log.innerText = `🔄 [시스템 자동 개입] ${nextInfo.label}(${nextInfo.day} ${nextInfo.time.split(' - ')[0]})로 핑 재발송...`;
+            document.getElementById('sim-title').innerText = '🔄 재조율 진행 중';
+            document.getElementById('sim-subtitle').innerHTML =
+                `대상 시간: <b>${nextInfo.day} ${nextInfo.time.split(' - ')[0]} (${nextInfo.label})</b>`;
+            showSection('step3', '3. 실시간 조율 대시보드', `⚠ ${rankInfo[firstRank].label} 시간 조율 실패 → 재시도 중`);
+            renderStatusList();
+        }, 5500);
+
+        // 4. 다음 순위 시간에 대한 필수 인원 수락 (7.5초 후)
+        setTimeout(() => {
+            acceptBadges(requiredIds);
+            log.innerText = optionalIds.length
+                ? "필수 인원 전원이 대체 시간을 수락했습니다. (선택 인원 대기 중)"
+                : "필수 인원 전원이 대체 시간을 수락했습니다.";
+        }, 7500);
+
+        // 5. 선택 인원 무응답 & 타임아웃 자동 수락 적용 (10초 후)
+        setTimeout(() => {
+            document.getElementById('sim-spinner').style.display = 'none';
+            document.getElementById('sim-title').innerText = '✅ 조율 완료';
+            if (optionalIds.length) {
+                log.style.color = "var(--success)";
+                log.innerText = `⏱️ 30분 경과: 무응답자(${namesOf(optionalIds)}) 자동 수락 처리됨.`;
+                autoAcceptBadges(optionalIds);
+            }
+        }, 10000);
+
+        // 6. 최종 확정 화면 이동 (12.5초 후)
+        setTimeout(() => {
+            goToStep4(nextRank);
+        }, 12500);
+    }
+
+    // 필수 인원이 1명 이하이거나 마지막 순위(3순위)를 선택한 경우: 거절/재조율 없이 바로 성공하는 흐름
+    function runDirectSuccessScenario(rank) {
+        const log = document.getElementById('system-log');
+        const requiredIds = getRequiredIds();
+        const optionalIds = getOptionalIds();
+
+        // 1. 필수 인원 전원 빠르게 수락 (1.5초 후)
+        setTimeout(() => {
+            acceptBadges(requiredIds);
+            log.innerText = requiredIds.length
+                ? `${namesOf(requiredIds)}님이 즉시 수락했습니다. (선택 인원 대기 중)`
+                : "필수 인원이 없어 바로 조율을 진행합니다. (선택 인원 대기 중)";
+        }, 1500);
+
+        // 2. 선택 인원 무응답 & 타임아웃 자동 수락 적용 (5초 후)
+        setTimeout(() => {
+            document.getElementById('sim-spinner').style.display = 'none';
+            document.getElementById('sim-title').innerText = '✅ 조율 완료';
+            if (optionalIds.length) {
+                log.style.color = "var(--success)";
+                log.innerText = `⏱️ 30분 경과: 무응답자(${namesOf(optionalIds)}) 자동 수락 처리됨.`;
+                autoAcceptBadges(optionalIds);
+            } else {
+                log.style.color = "var(--success)";
+                log.innerText = "전원 즉시 수락하여 바로 확정되었습니다.";
+            }
+        }, 5000);
+
+        // 3. 최종 확정 화면 이동 (7.5초 후)
+        setTimeout(() => {
+            goToStep4(rank);
+        }, 7500);
+    }
+</script>
+</body>
+</html>
