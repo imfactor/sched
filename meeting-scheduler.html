@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>합의 — 6인 회의 일정 조율 프로토타입</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12213B;
+    --ink-soft:#3E4C67;
+    --bg:#F5F7FA;
+    --surface:#FFFFFF;
+    --line:#E3E7EE;
+    --line-strong:#CBD3E0;
+    --accent:#2F6FED;
+    --accent-weak:#E9F0FE;
+    --required:#2F6FED;
+    --optional:#B8862F;
+    --optional-weak:#FBF1E0;
+    --ok:#1B9C6E;
+    --ok-weak:#E6F6EF;
+    --warn:#D98A1C;
+    --warn-weak:#FDF1DE;
+    --bad:#D1495B;
+    --bad-weak:#FBE9EC;
+    --mute:#9AA3B2;
+    --mute-weak:#EEF0F3;
+    --radius:14px;
+    --radius-sm:8px;
+    --shadow: 0 1px 2px rgba(18,33,59,0.04), 0 8px 24px -12px rgba(18,33,59,0.10);
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height:100vh;
+  }
+  .app{
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 32px 32px 80px;
+  }
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:28px;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-weight:700;
+    font-size:16px;
+    letter-spacing:-0.01em;
+  }
+  .brand .mark{
+    width:26px;height:26px;border-radius:8px;
+    background: linear-gradient(135deg, var(--accent), #1747A6);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff; font-size:13px; font-weight:800;
+  }
+  .brand .sub{
+    color: var(--mute);
+    font-weight:500;
+    font-size:12.5px;
+    margin-left:4px;
+  }
+  /* ---------- Step indicator ---------- */
+  .steps{
+    display:flex;
+    align-items:center;
+    background: var(--surface);
+    border:1px solid var(--line);
+    border-radius: 999px;
+    padding: 8px;
+    margin-bottom: 36px;
+    box-shadow: var(--shadow);
+  }
+  .step{
+    flex:1;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding: 8px 10px 8px 8px;
+    border-radius: 999px;
+    cursor:default;
+    position:relative;
+  }
+  .step.clickable{cursor:pointer;}
+  .step .dot{
+    width:26px;height:26px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;
+    font-family: var(--mono);
+    background: var(--mute-weak);
+    color: var(--mute);
+    flex-shrink:0;
+    transition: all .15s ease;
+  }
+  .step .label{
+    font-size:13px;
+    font-weight:600;
+    color: var(--mute);
+    white-space:nowrap;
+    transition: color .15s ease;
+  }
+  .step.done .dot{ background: var(--ok); color:#fff; }
+  .step.done .label{ color: var(--ink-soft); }
+  .step.active .dot{ background: var(--accent); color:#fff; box-shadow:0 0 0 5px var(--accent-weak); }
+  .step.active .label{ color: var(--ink); }
+  .step:not(:last-child)::after{
+    content:"";
+    position:absolute;
+    right:-4px; top:50%;
+    width:8px;height:8px;
+    border-top:1.5px solid var(--line-strong);
+    border-right:1.5px solid var(--line-strong);
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  /* ---------- Screen shell ---------- */
+  .screen{ display:none; }
+  .screen.active{ display:block; animation: fade .25s ease; }
+  @keyframes fade{ from{opacity:0; transform: translateY(6px);} to{opacity:1; transform:none;} }
+
+  .head{
+    margin-bottom: 24px;
+  }
+  .head .eyebrow{
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight:600;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    text-transform:uppercase;
+    margin-bottom:8px;
+  }
+  .head h1{
+    font-size: 24px;
+    margin:0 0 8px;
+    letter-spacing:-0.015em;
+  }
+  .head p{
+    margin:0;
+    color: var(--ink-soft);
+    font-size: 14.5px;
+    line-height:1.6;
+    max-width: 620px;
+  }
+
+  .card{
+    background: var(--surface);
+    border:1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  /* ---------- Screen 1: attendee setup ---------- */
+  .roster{
+    display:flex;
+    flex-direction:column;
+  }
+  .roster-row{
+    display:grid;
+    grid-template-columns: 200px 1px 190px 1px 1fr;
+    align-items:center;
+    gap:20px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .roster-row:last-child{ border-bottom:none; }
+  .who{ display:flex; align-items:center; gap:12px; }
+  .avatar{
+    width:38px;height:38px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700; font-size:13.5px; color:#fff;
+    flex-shrink:0;
+  }
+  .who-name{ font-weight:650; font-size:14.5px; }
+  .who-role{ font-size:12px; color: var(--mute); margin-top:1px; }
+  .divider{ width:1px; align-self:stretch; background: var(--line); }
+
+  .roletoggle{
+    display:flex;
+    background: var(--mute-weak);
+    border-radius: 999px;
+    padding:3px;
+    gap:2px;
+  }
+  .roletoggle button{
+    border:none; background:transparent;
+    font-family:inherit; font-size:12.5px; font-weight:650;
+    padding: 7px 10px;
+    border-radius:999px;
+    cursor:pointer;
+    color: var(--ink-soft);
+    transition: all .15s ease;
+    flex:1;
+  }
+  .roletoggle button.sel-required{ background: var(--required); color:#fff; }
+  .roletoggle button.sel-optional{ background: var(--optional); color:#fff; }
+  .roletoggle button.sel-out{ background: var(--mute); color:#fff; }
+
+  .prefs{ display:flex; flex-wrap:wrap; gap:8px; }
+  .pref-chip{
+    display:flex; align-items:center; gap:6px;
+    font-size:12.5px; font-weight:600;
+    padding:6px 11px;
+    border-radius:999px;
+    border:1.3px solid var(--line-strong);
+    background:#fff;
+    color: var(--ink-soft);
+    cursor:pointer;
+    user-select:none;
+    transition: all .15s ease;
+  }
+  .pref-chip input{ display:none; }
+  .pref-chip.on{
+    background: var(--optional-weak);
+    border-color: var(--optional);
+    color: #8A5F17;
+  }
+  .pref-chip .dot-ic{ width:6px;height:6px;border-radius:50%; background: var(--line-strong); }
+  .pref-chip.on .dot-ic{ background: var(--optional); }
+
+  .footer-bar{
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:26px;
+  }
+  .legend{ display:flex; gap:18px; font-size:12.5px; color: var(--mute); }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend i{ width:9px;height:9px;border-radius:50%; display:inline-block; }
+
+  .btn{
+    font-family:inherit;
+    border:none;
+    border-radius: 10px;
+    padding: 13px 22px;
+    font-size:14.5px;
+    font-weight:650;
+    cursor:pointer;
+    display:inline-flex; align-items:center; gap:8px;
+    transition: all .15s ease;
+  }
+  .btn-primary{ background: var(--accent); color:#fff; }
+  .btn-primary:hover{ background:#1D57CE; }
+  .btn-primary:disabled{ background: var(--mute); cursor:not-allowed; opacity:.6; }
+  .btn-ghost{ background: transparent; color: var(--ink-soft); border:1.3px solid var(--line-strong); }
+  .btn-ghost:hover{ background: #fff; border-color: var(--ink-soft); }
+  .btn-subtle{ background: var(--accent-weak); color: var(--accent); }
+  .btn-subtle:hover{ background:#DCE8FD; }
+
+  /* ---------- Screen 2: candidates ---------- */
+  .cand-grid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap:18px;
+    margin-bottom:26px;
+  }
+  .cand-card{
+    background:var(--surface);
+    border:1.6px solid var(--line);
+    border-radius: var(--radius);
+    padding:20px;
+    cursor:pointer;
+    box-shadow: var(--shadow);
+    transition: all .15s ease;
+    position:relative;
+  }
+  .cand-card:hover{ border-color: var(--line-strong); transform: translateY(-2px); }
+  .cand-card.selected{
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-weak), var(--shadow);
+  }
+  .cand-rank{
+    font-family: var(--mono);
+    font-size:11px; font-weight:600;
+    color: var(--mute);
+    letter-spacing:.05em;
+    margin-bottom:10px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .cand-rank .score{
+    color: var(--ok); font-weight:700;
+  }
+  .cand-rank.rank2 .score{ color: var(--warn); }
+  .cand-rank.rank3 .score{ color: var(--bad); }
+  .cand-day{ font-size:19px; font-weight:750; letter-spacing:-0.01em; }
+  .cand-time{ font-family: var(--mono); font-size:13px; color: var(--ink-soft); margin-top:2px; margin-bottom:14px;}
+
+  .reason{
+    font-size:12.5px;
+    line-height:1.5;
+    color: var(--ink-soft);
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    padding:10px 12px;
+    margin-bottom:14px;
+    min-height:52px;
+  }
+  .reason b{ color: var(--ink); }
+
+  .avatars-row{ display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .mini-av{
+    width:30px;height:30px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;color:#fff;
+    position:relative;
+    border:2px solid var(--surface);
+  }
+  .mini-av.state-bad{ filter:grayscale(1); opacity:.55; }
+  .mini-av .flag{
+    position:absolute; bottom:-3px; right:-3px;
+    width:14px;height:14px; border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:9px; font-weight:900;
+    border:1.6px solid var(--surface);
+  }
+  .flag-ok{ background: var(--ok); color:#fff; }
+  .flag-warn{ background: var(--warn); color:#fff; }
+  .flag-bad{ background: var(--mute); color:#fff; }
+
+  .consent-bar{
+    height:8px; border-radius:999px; overflow:hidden;
+    display:flex; background: var(--mute-weak); margin-bottom:8px;
+  }
+  .consent-bar span{ height:100%; }
+  .consent-label{ font-size:11.5px; color:var(--mute); font-family: var(--mono); }
+
+  /* ---------- Screen 3: attendee response simulation ---------- */
+  .sim-wrap{ display:flex; gap:26px; align-items:flex-start; }
+  .sim-card{ flex:1.3; padding:32px; }
+  .sim-side{ flex:1; padding:24px; }
+
+  .invite-time{
+    display:flex; align-items:center; gap:16px;
+    padding:18px 20px;
+    background: var(--accent-weak);
+    border-radius: var(--radius-sm);
+    margin-bottom:22px;
+  }
+  .invite-time .big{ font-size:15px; font-weight:600; color:var(--ink); }
+  .invite-time .icon{
+    width:44px;height:44px;border-radius:12px;
+    background:#fff; display:flex;align-items:center;justify-content:center;
+    font-size:20px; flex-shrink:0;
+  }
+  .invite-meta{ font-size:12.5px; color: var(--accent); font-weight:600; margin-top:3px; }
+
+  .respondent{ display:flex; align-items:center; gap:12px; margin-bottom:22px; }
+  .respondent .name{ font-weight:700; font-size:15px; }
+  .respondent .tag{
+    font-size:11.5px; font-weight:700; color: var(--required);
+    background: var(--accent-weak); padding:3px 9px; border-radius:999px;
+    margin-left:4px;
+  }
+
+  .resp-options{ display:flex; flex-direction:column; gap:10px; margin-top:6px;}
+  .resp-btn{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:15px 18px;
+    border-radius: var(--radius-sm);
+    border:1.6px solid var(--line-strong);
+    background:#fff;
+    cursor:pointer;
+    font-weight:650; font-size:14.5px;
+    color: var(--ink);
+    transition: all .15s ease;
+  }
+  .resp-btn:hover{ border-color: var(--accent); background: var(--accent-weak); }
+  .resp-btn .sub{ font-size:12px; font-weight:500; color: var(--mute); margin-top:3px; }
+  .resp-btn.ok:hover{ border-color: var(--ok); background: var(--ok-weak); }
+  .resp-btn.bad:hover{ border-color: var(--bad); background: var(--bad-weak); }
+  .resp-btn.alt:hover{ border-color: var(--warn); background: var(--warn-weak); }
+
+  .countdown-box{
+    text-align:center;
+    padding:26px 18px;
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    border:1px dashed var(--line-strong);
+  }
+  .countdown-box .cd-label{ font-size:12.5px; color: var(--mute); font-weight:600; margin-bottom:8px; }
+  .countdown-box .cd-time{
+    font-family: var(--mono); font-size:30px; font-weight:600; color: var(--ink);
+    letter-spacing:-0.02em;
+  }
+  .cd-note{ font-size:12px; color: var(--mute); margin-top:10px; line-height:1.5; }
+
+  .pref-note{
+    margin-top:20px;
+    display:flex; gap:10px;
+    padding:13px 14px;
+    background: var(--optional-weak);
+    border-radius: var(--radius-sm);
+    font-size:12.5px; color:#8A5F17; line-height:1.5;
+  }
+
+  /* ---------- Screen 4: dashboard ---------- */
+  .banner{
+    display:flex; align-items:center; gap:12px;
+    padding:14px 18px;
+    border-radius: var(--radius-sm);
+    background: var(--bad-weak);
+    border:1px solid #F3C6CD;
+    color:#8E2E3D;
+    font-size:13.5px; font-weight:600;
+    margin-bottom:20px;
+  }
+  .banner .ic{ font-size:17px; }
+
+  .dash-grid{ display:grid; grid-template-columns: 1.5fr 1fr; gap:20px; align-items:start; }
+  .resp-list{ display:flex; flex-direction:column; }
+  .resp-item{
+    display:grid;
+    grid-template-columns: 44px 1fr 130px 90px;
+    align-items:center;
+    gap:14px;
+    padding:14px 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .resp-item:last-child{ border-bottom:none; }
+  .resp-item .rname{ font-weight:650; font-size:14px; }
+  .resp-item .rrole{ font-size:11.5px; color: var(--mute); margin-top:1px; }
+  .status-pill{
+    font-size:12px; font-weight:700;
+    padding:6px 11px; border-radius:999px;
+    text-align:center;
+    white-space:nowrap;
+  }
+  .status-ok{ background: var(--ok-weak); color: var(--ok); }
+  .status-bad{ background: var(--bad-weak); color: var(--bad); }
+  .status-alt{ background: var(--warn-weak); color: var(--warn); }
+  .status-wait{ background: var(--mute-weak); color: var(--mute); }
+  .status-auto{ background: var(--mute-weak); color:#7A8394; }
+
+  .side-card{ padding:20px; margin-bottom:16px; }
+  .side-card h3{ font-size:13.5px; margin:0 0 12px; }
+  .stat-row{ display:flex; justify-content:space-between; font-size:13px; padding:7px 0; border-bottom:1px dashed var(--line); }
+  .stat-row:last-child{ border-bottom:none; }
+  .stat-row .n{ font-family: var(--mono); font-weight:600; }
+
+  /* ---------- Screen 5: final ---------- */
+  .final-hero{
+    text-align:center;
+    padding: 44px 32px 34px;
+  }
+  .final-hero .check{
+    width:56px;height:56px;border-radius:50%;
+    background: var(--ok);
+    color:#fff; font-size:26px;
+    display:flex;align-items:center;justify-content:center;
+    margin: 0 auto 18px;
+  }
+  .final-hero h2{ font-size:22px; margin:0 0 6px; }
+  .final-hero .when{ font-family: var(--mono); font-size:15px; color: var(--ink-soft); }
+
+  .attend-cols{ display:grid; grid-template-columns:1fr 1fr; gap:0; border-top:1px solid var(--line); }
+  .attend-col{ padding:22px 26px; }
+  .attend-col:first-child{ border-right:1px solid var(--line); }
+  .attend-col h4{ font-size:12.5px; text-transform:uppercase; letter-spacing:.04em; color: var(--mute); margin:0 0 14px; }
+  .attend-person{ display:flex; align-items:center; gap:10px; padding:7px 0; font-size:14px; font-weight:600; }
+
+  .summary-box{
+    margin: 0 26px 26px;
+    padding:16px 18px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    font-size:13px; line-height:1.7; color: var(--ink-soft);
+  }
+  .summary-box b{ color: var(--ink); }
+
+  .reoffer-btn-wrap{ text-align:center; margin-top:18px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand"><span class="mark">협</span>합의 <span class="sub">Meeting Consensus · 프로토타입</span></div>
+  </div>
+
+  <div class="steps" id="stepIndicator"></div>
+
+  <!-- ===================== SCREEN 1 ===================== -->
+  <section class="screen" id="screen-1">
+    <div class="head">
+      <div class="eyebrow">STEP 1 · 주최자</div>
+      <h1>참석자를 등록하고 조건을 확인하세요</h1>
+      <p>필수 참석자는 반드시 가능해야 하는 시간을, 선택 참석자는 선호를 감안해 조율합니다. 아래 선호 조건은 최근 캘린더 패턴을 바탕으로 미리 채워졌어요.</p>
+    </div>
+
+    <div class="card roster" id="roster"></div>
+
+    <div class="footer-bar">
+      <div class="legend">
+        <span><i style="background:var(--required)"></i>필수</span>
+        <span><i style="background:var(--optional)"></i>선택</span>
+        <span><i style="background:var(--mute)"></i>미참여</span>
+      </div>
+      <button class="btn btn-primary" onclick="goTo(2)">회의 시간 찾기 →</button>
+    </div>
+  </section>
+
+  <!-- ===================== SCREEN 2 ===================== -->
+  <section class="screen" id="screen-2">
+    <div class="head">
+      <div class="eyebrow">STEP 2 · 시스템 추천</div>
+      <h1 id="s2-title">조건에 맞는 후보 시간 3개를 찾았어요</h1>
+      <p>빈 시간이 아니라 <b>합의 가능성</b> 기준으로 정렬했습니다. 카드를 눌러 요청을 보낼 시간을 고르세요.</p>
+    </div>
+
+    <div class="cand-grid" id="candGrid"></div>
+
+    <div class="footer-bar">
+      <button class="btn btn-ghost" onclick="goTo(1)">← 이전</button>
+      <button class="btn btn-primary" id="sendReqBtn" disabled onclick="goTo(3)">이 시간으로 요청 보내기 →</button>
+    </div>
+  </section>
+
+  <!-- ===================== SCREEN 3 ===================== -->
+  <section class="screen" id="screen-3">
+    <div class="head">
+      <div class="eyebrow">STEP 3 · 참석자 응답</div>
+      <h1>참석자에게 이렇게 보여요</h1>
+      <p>박서연 님의 화면을 시뮬레이션합니다. 실제로는 6명 모두에게 동일한 요청이 개별 발송돼요.</p>
+    </div>
+
+    <div class="sim-wrap">
+      <div class="card sim-card">
+        <div class="respondent">
+          <div class="avatar" style="background:#C7509B">서</div>
+          <div>
+            <div class="name">박서연 <span class="tag">필수 참석</span></div>
+            <div style="font-size:12.5px;color:var(--mute);margin-top:2px;">디자인팀 · 프로덕트 디자이너</div>
+          </div>
+        </div>
+
+        <div class="invite-time">
+          <div class="icon">🗓️</div>
+          <div>
+            <div class="big" id="s3-time">수요일 오전 10:00 – 11:00</div>
+            <div class="invite-meta">6인 정기 싱크업 요청</div>
+          </div>
+        </div>
+
+        <div class="pref-note">⚠️ 회원님의 선호 조건(점심 직후 회피)과는 무관한 시간이지만, 검토 후 응답해주세요.</div>
+
+        <div class="resp-options" style="margin-top:20px;">
+          <button class="resp-btn ok" onclick="respondAs('가능')">
+            <span>✅ 가능해요<div class="sub">이 시간에 참석할 수 있어요</div></span>
+          </button>
+          <button class="resp-btn bad" onclick="respondAs('어려움')">
+            <span>🚫 어려워요<div class="sub">이 시간엔 참석이 힘들어요</div></span>
+          </button>
+          <button class="resp-btn alt" onclick="respondAs('다른 시간 제안')">
+            <span>🔁 다른 시간을 제안할게요<div class="sub">대안 시간을 주최자에게 전달해요</div></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="card sim-side">
+        <div class="countdown-box">
+          <div class="cd-label">응답 마감까지</div>
+          <div class="cd-time" id="countdown">06:00:00</div>
+          <div class="cd-note">마감 전까지 응답이 없으면 선택 참석자는 자동으로 불참 처리되고, 필수 참석자는 상단에 경고가 표시돼요.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <button class="btn btn-ghost" onclick="goTo(2)">← 이전</button>
+      <div style="font-size:12.5px;color:var(--mute);">버튼을 눌러 응답을 시뮬레이션하세요</div>
+    </div>
+  </section>
+
+  <!-- ===================== SCREEN 4 ===================== -->
+  <section class="screen" id="screen-4">
+    <div class="head">
+      <div class="eyebrow">STEP 4 · 주최자 대시보드</div>
+      <h1>응답 현황</h1>
+      <p id="s4-sub">6명 중 응답 현황을 실시간으로 확인하세요.</p>
+    </div>
+
+    <div id="warnBanner" class="banner" style="display:none;">
+      <span class="ic">⚠️</span>
+      <span id="warnBannerText"></span>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card">
+        <div class="resp-list" id="respList"></div>
+      </div>
+      <div>
+        <div class="card side-card">
+          <h3>응답 요약</h3>
+          <div id="statSummary"></div>
+        </div>
+        <div class="card side-card" id="actionCard">
+          <h3>다음 액션</h3>
+          <p style="font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin:0 0 14px;" id="actionText"></p>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;" id="actionBtn"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <button class="btn btn-ghost" onclick="goTo(3)">← 이전</button>
+      <div></div>
+    </div>
+  </section>
+
+  <!-- ===================== SCREEN 5 ===================== -->
+  <section class="screen" id="screen-5">
+    <div class="head">
+      <div class="eyebrow">STEP 5 · 최종 확정</div>
+      <h1>회의가 확정됐어요</h1>
+      <p>최소한의 확인만으로 필수 참석자 전원의 합의를 얻었습니다.</p>
+    </div>
+
+    <div class="card">
+      <div class="final-hero">
+        <div class="check">✓</div>
+        <h2 id="finalDay">수요일 오전 10:00 – 11:00</h2>
+        <div class="when">6인 정기 싱크업</div>
+      </div>
+      <div class="attend-cols">
+        <div class="attend-col">
+          <h4>필수 참석 · 3/3</h4>
+          <div id="finalRequired"></div>
+        </div>
+        <div class="attend-col">
+          <h4>선택 참석</h4>
+          <div id="finalOptional"></div>
+        </div>
+      </div>
+      <div class="summary-box">
+        <b>확정 근거.</b> <span id="finalReason"></span>
+      </div>
+    </div>
+
+    <div class="footer-bar">
+      <button class="btn btn-ghost" onclick="goTo(4)">← 이전</button>
+      <button class="btn btn-subtle" onclick="resetAll()">↺ 처음부터 다시 체험하기</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============ DATA ============ */
+const PEOPLE = [
+  { id:'p1', name:'김도윤', role:'required', title:'PM · 주최자', color:'#2F6FED', avatar:'도', prefs:[] },
+  { id:'p2', name:'박서연', role:'required', title:'프로덕트 디자이너', color:'#C7509B', avatar:'서', prefs:['lunch'] },
+  { id:'p3', name:'이하준', role:'required', title:'백엔드 엔지니어', color:'#1B9C6E', avatar:'하', prefs:[] },
+  { id:'p4', name:'최윤아', role:'optional', title:'세일즈 매니저', color:'#D98A1C', avatar:'윤', prefs:['tue-out'] },
+  { id:'p5', name:'정민준', role:'optional', title:'데이터 분석가', color:'#6B57D9', avatar:'민', prefs:['lunch'] },
+  { id:'p6', name:'강지우', role:'out', title:'마케팅', color:'#9AA3B2', avatar:'지', prefs:[] },
+];
+
+const PREF_DEFS = {
+  'lunch':  { label:'점심 직후 회피 (13–14시)' },
+  'tue-out':{ label:'화요일 외근' },
+};
+
+const CANDIDATES = [
+  {
+    day:'수요일', date:'7/15', time:'오전 10:00 – 11:00',
+    score:98, rank:1,
+    reason:'<b>필수 참석자 전원 가능</b> · 선택 참석자 전원 선호 조건에 부합 · 최근 3주간 겹치는 외근·휴가 없음',
+    people:{ p1:'ok', p2:'ok', p3:'ok', p4:'ok', p5:'ok', p6:'excluded' }
+  },
+  {
+    day:'화요일', date:'7/14', time:'오후 3:00 – 4:00',
+    score:82, rank:2,
+    reason:'<b>필수 참석자 전원 가능</b> · 선택 참석자 최윤아 화요일 외근으로 <b>불가</b>',
+    people:{ p1:'ok', p2:'ok', p3:'ok', p4:'bad', p5:'ok', p6:'excluded' }
+  },
+  {
+    day:'목요일', date:'7/16', time:'오후 2:00 – 3:00',
+    score:70, rank:3,
+    reason:'필수 참석자 전원 가능하지만 <b>박서연 · 정민준 점심 직후 선호 위반</b>',
+    people:{ p1:'ok', p2:'warn', p3:'ok', p4:'ok', p5:'warn', p6:'excluded' }
+  },
+];
+
+const EXTRA_CANDIDATE = {
+  day:'금요일', date:'7/17', time:'오전 11:00 – 12:00',
+  score:64, rank:4,
+  reason:'필수 참석자 전원 가능 · 선택 참석자 2명 모두 선호 조건 부합하나 회의 밀도가 높은 요일',
+  people:{ p1:'ok', p2:'ok', p3:'ok', p4:'ok', p5:'ok', p6:'excluded' }
+};
+
+/* ============ STATE ============ */
+let state = {
+  step: 1,
+  maxStepReached: 1,
+  selectedCandidateIdx: null,
+  extraShown: false,
+  responses: {}, // personId -> '가능' | '어려움' | '다른 시간 제안' | null
+  countdownInterval: null,
+  countdownSeconds: 6*3600,
+};
+
+function initResponses(){
+  // Prefilled dummy responses to make dashboard feel alive; 박서연(p2) is answered live in step 3
+  state.responses = {
+    p1: '가능',
+    p2: null,
+    p3: '가능',
+    p4: '다른 시간 제안',
+    p5: null,
+    p6: null,
+  };
+}
+initResponses();
+
+/* ============ STEP INDICATOR ============ */
+const STEP_LABELS = ['참석자 등록','후보 추천','참석자 응답','응답 현황','최종 확정'];
+function renderSteps(){
+  const wrap = document.getElementById('stepIndicator');
+  wrap.innerHTML = '';
+  STEP_LABELS.forEach((label, i)=>{
+    const n = i+1;
+    const div = document.createElement('div');
+    let cls = 'step';
+    if(n < state.step) cls += ' done';
+    if(n === state.step) cls += ' active';
+    if(n <= state.maxStepReached) cls += ' clickable';
+    div.className = cls;
+    div.innerHTML = `<div class="dot">${n < state.step ? '✓' : n}</div><div class="label">${label}</div>`;
+    if(n <= state.maxStepReached){
+      div.addEventListener('click', ()=> goTo(n));
+    }
+    wrap.appendChild(div);
+  });
+}
+
+function goTo(n){
+  state.step = n;
+  state.maxStepReached = Math.max(state.maxStepReached, n);
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+n).classList.add('active');
+  renderSteps();
+  if(n===1) renderRoster();
+  if(n===2) renderCandidates();
+  if(n===3) startCountdown();
+  if(n===4) renderDashboard();
+  if(n===5) renderFinal();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ============ SCREEN 1: ROSTER ============ */
+function renderRoster(){
+  const el = document.getElementById('roster');
+  el.innerHTML = '';
+  PEOPLE.forEach(p=>{
+    const row = document.createElement('div');
+    row.className = 'roster-row';
+    const prefChips = Object.keys(PREF_DEFS).map(key=>{
+      const on = p.prefs.includes(key);
+      return `<label class="pref-chip ${on?'on':''}" onclick="togglePref(event,'${p.id}','${key}')">
+        <span class="dot-ic"></span>${PREF_DEFS[key].label}
+      </label>`;
+    }).join('');
+
+    row.innerHTML = `
+      <div class="who">
+        <div class="avatar" style="background:${p.color}">${p.avatar}</div>
+        <div>
+          <div class="who-name">${p.name}</div>
+          <div class="who-role">${p.title}</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="roletoggle">
+        <button class="${p.role==='required'?'sel-required':''}" onclick="setRole('${p.id}','required')">필수</button>
+        <button class="${p.role==='optional'?'sel-optional':''}" onclick="setRole('${p.id}','optional')">선택</button>
+        <button class="${p.role==='out'?'sel-out':''}" onclick="setRole('${p.id}','out')">미참여</button>
+      </div>
+      <div class="divider"></div>
+      <div class="prefs">${prefChips || '<span style="font-size:12.5px;color:var(--mute);">선호 조건 없음</span>'}</div>
+    `;
+    el.appendChild(row);
+  });
+}
+function setRole(id, role){
+  const p = PEOPLE.find(x=>x.id===id);
+  p.role = role;
+  renderRoster();
+}
+function togglePref(e, id, key){
+  e.preventDefault();
+  const p = PEOPLE.find(x=>x.id===id);
+  if(p.prefs.includes(key)) p.prefs = p.prefs.filter(k=>k!==key);
+  else p.prefs.push(key);
+  renderRoster();
+}
+
+/* ============ SCREEN 2: CANDIDATES ============ */
+function currentCandidateList(){
+  return state.extraShown ? [...CANDIDATES, EXTRA_CANDIDATE] : CANDIDATES;
+}
+function renderCandidates(){
+  const grid = document.getElementById('candGrid');
+  grid.innerHTML = '';
+  const list = currentCandidateList();
+  document.getElementById('s2-title').textContent = state.extraShown
+    ? '재조율된 후보를 포함해 4개를 찾았어요'
+    : '조건에 맞는 후보 시간 3개를 찾았어요';
+
+  list.forEach((c, idx)=>{
+    const card = document.createElement('div');
+    card.className = 'cand-card' + (state.selectedCandidateIdx===idx ? ' selected':'');
+    const rankClass = c.rank===2 ? 'rank2' : (c.rank>=3 ? 'rank3' : '');
+
+    const avatarsHtml = PEOPLE.map(p=>{
+      const st = c.people[p.id];
+      if(st === 'excluded') return '';
+      let flagHtml = '';
+      let cls = '';
+      if(st==='ok') flagHtml = '<span class="flag flag-ok">✓</span>';
+      else if(st==='warn') flagHtml = '<span class="flag flag-warn">!</span>';
+      else { flagHtml = '<span class="flag flag-bad">×</span>'; cls='state-bad'; }
+      return `<div class="mini-av ${cls}" style="background:${p.color}" title="${p.name}">${p.avatar}${flagHtml}</div>`;
+    }).join('');
+
+    const total = PEOPLE.filter(p=>c.people[p.id] && c.people[p.id]!=='excluded').length;
+    const okCount = PEOPLE.filter(p=>c.people[p.id]==='ok').length;
+    const warnCount = PEOPLE.filter(p=>c.people[p.id]==='warn').length;
+    const badCount = PEOPLE.filter(p=>c.people[p.id]==='bad').length;
+    const pct = (n)=> (n/total*100).toFixed(0)+'%';
+
+    card.innerHTML = `
+      <div class="cand-rank ${rankClass}">
+        <span>후보 ${c.rank}</span>
+        <span class="score">합의도 ${c.score}%</span>
+      </div>
+      <div class="cand-day">${c.day} <span style="color:var(--mute);font-weight:500;font-size:14px;">${c.date}</span></div>
+      <div class="cand-time">${c.time}</div>
+      <div class="reason">${c.reason}</div>
+      <div class="avatars-row">${avatarsHtml}</div>
+      <div class="consent-bar">
+        <span style="width:${pct(okCount)};background:var(--ok)"></span>
+        <span style="width:${pct(warnCount)};background:var(--warn)"></span>
+        <span style="width:${pct(badCount)};background:var(--mute)"></span>
+      </div>
+      <div class="consent-label">가능 ${okCount} · 선호위반 ${warnCount} · 불가 ${badCount}</div>
+    `;
+    card.addEventListener('click', ()=> selectCandidate(idx));
+    grid.appendChild(card);
+  });
+}
+function selectCandidate(idx){
+  state.selectedCandidateIdx = idx;
+  renderCandidates();
+  document.getElementById('sendReqBtn').disabled = false;
+}
+
+/* ============ SCREEN 3: RESPONSE SIMULATION ============ */
+function getSelectedCandidate(){
+  const list = currentCandidateList();
+  return list[state.selectedCandidateIdx ?? 0];
+}
+function startCountdown(){
+  const c = getSelectedCandidate();
+  document.getElementById('s3-time').textContent = `${c.day} ${c.time}`;
+  clearInterval(state.countdownInterval);
+  state.countdownSeconds = 6*3600;
+  updateCountdownDisplay();
+  state.countdownInterval = setInterval(()=>{
+    state.countdownSeconds -= 37; // accelerated for demo purposes
+    if(state.countdownSeconds <= 0){
+      state.countdownSeconds = 0;
+      clearInterval(state.countdownInterval);
+    }
+    updateCountdownDisplay();
+  }, 1000);
+}
+function updateCountdownDisplay(){
+  const s = Math.max(0, state.countdownSeconds);
+  const h = String(Math.floor(s/3600)).padStart(2,'0');
+  const m = String(Math.floor((s%3600)/60)).padStart(2,'0');
+  const sec = String(Math.floor(s%60)).padStart(2,'0');
+  document.getElementById('countdown').textContent = `${h}:${m}:${sec}`;
+}
+function respondAs(answer){
+  state.responses['p2'] = answer; // 박서연
+  clearInterval(state.countdownInterval);
+  goTo(4);
+}
+
+/* ============ SCREEN 4: DASHBOARD ============ */
+function renderDashboard(){
+  const c = getSelectedCandidate();
+  document.getElementById('s4-sub').textContent = `${c.day} ${c.time} 요청에 대한 응답을 모으고 있어요.`;
+
+  const list = document.getElementById('respList');
+  list.innerHTML = '';
+
+  let requiredMissing = 0;
+  let counts = { 가능:0, 어려움:0, '다른 시간 제안':0, 무응답:0 };
+
+  PEOPLE.forEach(p=>{
+    if(p.role === 'out') return;
+    const resp = state.responses[p.id];
+    let pillClass = 'status-wait', pillText = '무응답';
+    let autoLabel = '';
+
+    if(resp === '가능'){ pillClass='status-ok'; pillText='가능'; counts['가능']++; }
+    else if(resp === '어려움'){ pillClass='status-bad'; pillText='어려움'; counts['어려움']++; }
+    else if(resp === '다른 시간 제안'){ pillClass='status-alt'; pillText='다른 시간 제안'; counts['다른 시간 제안']++; }
+    else {
+      counts['무응답']++;
+      if(p.role === 'optional' && state.countdownSeconds <= 0){
+        pillClass='status-auto'; pillText='자동 불참 처리'; autoLabel='마감 경과';
+      }
+      if(p.role === 'required') requiredMissing++;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'resp-item';
+    row.innerHTML = `
+      <div class="avatar" style="background:${p.color};width:36px;height:36px;font-size:12px;">${p.avatar}</div>
+      <div>
+        <div class="rname">${p.name}</div>
+        <div class="rrole">${p.role==='required'?'필수 참석':'선택 참석'} · ${p.title}</div>
+      </div>
+      <div style="font-size:11.5px;color:var(--mute);">${autoLabel}</div>
+      <div class="status-pill ${pillClass}">${pillText}</div>
+    `;
+    list.appendChild(row);
+  });
+
+  // warning banner
+  const banner = document.getElementById('warnBanner');
+  if(requiredMissing > 0){
+    banner.style.display = 'flex';
+    document.getElementById('warnBannerText').textContent =
+      `필수 참석자 ${requiredMissing}명이 아직 응답하지 않았어요. 회의를 확정하려면 응답이 필요합니다.`;
+  } else {
+    banner.style.display = 'none';
+  }
+
+  // stat summary
+  const statEl = document.getElementById('statSummary');
+  statEl.innerHTML = Object.entries(counts).map(([k,v])=>`
+    <div class="stat-row"><span>${k}</span><span class="n">${v}명</span></div>
+  `).join('');
+
+  // action card
+  const requiredAllOk = PEOPLE.filter(p=>p.role==='required').every(p=> state.responses[p.id] === '가능');
+  const anyHardConflict = PEOPLE.filter(p=>p.role==='required').some(p=> state.responses[p.id] === '어려움' || state.responses[p.id] === '다른 시간 제안');
+
+  const actionText = document.getElementById('actionText');
+  const actionBtn = document.getElementById('actionBtn');
+
+  if(requiredAllOk){
+    actionText.textContent = '필수 참석자 전원이 가능하다고 응답했어요. 지금 바로 회의를 확정할 수 있어요.';
+    actionBtn.textContent = '회의 확정하기 →';
+    actionBtn.className = 'btn btn-primary';
+    actionBtn.style.width = '100%'; actionBtn.style.justifyContent='center';
+    actionBtn.onclick = ()=> goTo(5);
+  } else if(anyHardConflict){
+    actionText.textContent = '필수 참석자 중 일부가 이 시간이 어렵다고 답했어요. 다음 순위 후보로 재조율해보세요.';
+    actionBtn.textContent = '다음 후보로 재조율 →';
+    actionBtn.className = 'btn btn-primary';
+    actionBtn.style.width = '100%'; actionBtn.style.justifyContent='center';
+    actionBtn.onclick = ()=>{
+      state.extraShown = true;
+      state.selectedCandidateIdx = null;
+      goTo(2);
+      document.getElementById('sendReqBtn').disabled = true;
+    };
+  } else {
+    actionText.textContent = '아직 응답을 기다리는 중이에요. 마감 전까지 조금 더 지켜볼까요?';
+    actionBtn.textContent = '리마인드 보내기';
+    actionBtn.className = 'btn btn-ghost';
+    actionBtn.style.width = '100%'; actionBtn.style.justifyContent='center';
+    actionBtn.onclick = ()=>{
+      // simulate remaining people responding for demo flow
+      state.responses['p5'] = '가능';
+      if(state.responses['p2']==null) state.responses['p2']='가능';
+      renderDashboard();
+    };
+  }
+}
+
+/* ============ SCREEN 5: FINAL ============ */
+function renderFinal(){
+  const c = getSelectedCandidate();
+  document.getElementById('finalDay').textContent = `${c.day} ${c.date} · ${c.time}`;
+
+  const req = PEOPLE.filter(p=>p.role==='required');
+  const opt = PEOPLE.filter(p=>p.role==='optional' && (state.responses[p.id]==='가능'));
+  const optDeclined = PEOPLE.filter(p=>p.role==='optional' && state.responses[p.id]!=='가능');
+
+  document.getElementById('finalRequired').innerHTML = req.map(p=>`
+    <div class="attend-person">
+      <div class="avatar" style="background:${p.color};width:28px;height:28px;font-size:11px;">${p.avatar}</div>
+      ${p.name} <span style="color:var(--ok);font-size:12px;margin-left:auto;">✓ 확정</span>
+    </div>
+  `).join('');
+
+  let optHtml = opt.map(p=>`
+    <div class="attend-person">
+      <div class="avatar" style="background:${p.color};width:28px;height:28px;font-size:11px;">${p.avatar}</div>
+      ${p.name} <span style="color:var(--ok);font-size:12px;margin-left:auto;">✓ 참석</span>
+    </div>
+  `).join('');
+  optHtml += optDeclined.map(p=>`
+    <div class="attend-person" style="opacity:.55;">
+      <div class="avatar" style="background:${p.color};width:28px;height:28px;font-size:11px;">${p.avatar}</div>
+      ${p.name} <span style="color:var(--mute);font-size:12px;margin-left:auto;">불참</span>
+    </div>
+  `).join('');
+  document.getElementById('finalOptional').innerHTML = optHtml || '<div style="font-size:13px;color:var(--mute);">선택 참석자 없음</div>';
+
+  document.getElementById('finalReason').innerHTML =
+    `필수 참석자 <b>${req.length}명 전원</b>이 가능 응답을 완료해 확정되었습니다. 선택 참석자는 응답 결과에 따라 <b>${opt.length}명</b>이 함께합니다. 전체 조율은 후보 제안부터 확정까지 <b>단 1회의 재조율</b> 없이 진행됐어요.`;
+}
+
+/* ============ RESET ============ */
+function resetAll(){
+  PEOPLE[0].role='required'; PEOPLE[1].role='required'; PEOPLE[2].role='required';
+  PEOPLE[3].role='optional'; PEOPLE[4].role='optional'; PEOPLE[5].role='out';
+  PEOPLE[1].prefs=['lunch']; PEOPLE[3].prefs=['tue-out']; PEOPLE[4].prefs=['lunch'];
+  PEOPLE[0].prefs=[]; PEOPLE[2].prefs=[]; PEOPLE[5].prefs=[];
+  state = { step:1, maxStepReached:1, selectedCandidateIdx:null, extraShown:false, responses:{}, countdownInterval:null, countdownSeconds:6*3600 };
+  initResponses();
+  goTo(1);
+}
+
+/* ============ INIT ============ */
+goTo(1);
+</script>
+</body>
+</html>
