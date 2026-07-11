@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>합의 — 6인 회의 일정 조율 프로토타입</title>
+<title>회의 일정 조율 사용 흐름</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -219,9 +219,12 @@
     border:1.3px solid var(--line-strong);
     background:#fff;
     color: var(--ink-soft);
-    cursor:pointer;
+    cursor:default;
     user-select:none;
     transition: all .15s ease;
+  }
+  .pref-chip .pref-hint{
+    font-size:10.5px; font-weight:600; color: var(--mute); margin-left:2px;
   }
   .pref-chip input{ display:none; }
   .pref-chip.on{
@@ -303,11 +306,24 @@
     color: var(--ink-soft);
     background: var(--bg);
     border-radius: var(--radius-sm);
-    padding:10px 12px;
+    padding:12px 14px;
     margin-bottom:14px;
-    min-height:52px;
+    min-height:78px;
   }
   .reason b{ color: var(--ink); }
+  .reason .reason-line{
+    display:flex;
+    gap:7px;
+    align-items:flex-start;
+  }
+  .reason .reason-line:not(:last-child){ margin-bottom:6px; }
+  .reason .reason-line::before{
+    content:"";
+    width:4px;height:4px;border-radius:50%;
+    background: var(--line-strong);
+    margin-top:6px;
+    flex-shrink:0;
+  }
 
   .avatars-row{ display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
   .mini-av{
@@ -486,17 +502,19 @@
 <div class="app">
 
   <div class="topbar">
-    <div class="brand"><span class="mark">협</span>합의 <span class="sub">Meeting Consensus · 프로토타입</span></div>
+    <div class="brand"><span class="mark">캘</span>회의 일정 <span class="sub">회의 일정 조율 사용 흐름</span></div>
   </div>
 
   <div class="steps" id="stepIndicator"></div>
+  <div style="font-size:12.5px;color:var(--mute);margin-top:2px;"><p>※솔루션 설명을 위한 화면 흐름 위주의 <b>예시 페이지</b>로 제작되었습니다.</p></div>
+
 
   <!-- ===================== SCREEN 1 ===================== -->
   <section class="screen" id="screen-1">
     <div class="head">
       <div class="eyebrow">STEP 1 · 주최자</div>
       <h1>참석자를 등록하고 조건을 확인하세요</h1>
-      <p>필수 참석자는 반드시 가능해야 하는 시간을, 선택 참석자는 선호를 감안해 조율합니다. 아래 선호 조건은 최근 캘린더 패턴을 바탕으로 미리 채워졌어요.</p>
+      <p>필수 참석자는 반드시 가능해야 하는 시간을, 선택 참석자는 선호를 감안해 조율합니다.<br>사용자가 설정한 선호 조건이 우측이 표시됩니다.</p>
     </div>
 
     <div class="card roster" id="roster"></div>
@@ -516,7 +534,7 @@
     <div class="head">
       <div class="eyebrow">STEP 2 · 시스템 추천</div>
       <h1 id="s2-title">조건에 맞는 후보 시간 3개를 찾았어요</h1>
-      <p><b>합의 가능성</b> 기준으로 정렬했습니다. 카드를 눌러 요청을 보낼 시간을 고르세요.</p>
+      <p>빈 시간이 아니라 <b>합의 가능성</b> 기준으로 정렬했습니다. 카드를 눌러 요청을 보낼 시간을 고르세요.</p>
     </div>
 
     <div class="cand-grid" id="candGrid"></div>
@@ -531,8 +549,8 @@
   <section class="screen" id="screen-3">
     <div class="head">
       <div class="eyebrow">STEP 3 · 참석자 응답</div>
-      <h1>참석자 시점 화면</h1>
-      <p>박서연 님의 화면입니다. 실제로는 6명 모두에게 동일한 요청이 개별 발송됩니다.</p>
+      <h1>참석자에게 이렇게 보여요</h1>
+      <p>박서연 님의 화면을 시뮬레이션합니다. 실제로는 6명 모두에게 동일한 요청이 개별 발송돼요.</p>
     </div>
 
     <div class="sim-wrap">
@@ -553,7 +571,7 @@
           </div>
         </div>
 
-        <div class="pref-note">⚠️ 회원님의 선호 조건(점심 직후 회피)과는 무관한 시간이지만, 검토 후 응답해주세요.</div>
+        <div class="pref-note">⚠️ 회의 가능 시간 검토 후 응답해주세요.</div>
 
         <div class="resp-options" style="margin-top:20px;">
           <button class="resp-btn ok" onclick="respondAs('가능')">
@@ -571,7 +589,7 @@
       <div class="card sim-side">
         <div class="countdown-box">
           <div class="cd-label">응답 마감까지</div>
-          <div class="cd-time" id="countdown">06:00:00</div>
+          <div class="cd-time" id="countdown">00:30:00</div>
           <div class="cd-note">마감 전까지 응답이 없으면 선택 참석자는 자동으로 불참 처리되고, 필수 참석자는 상단에 경고가 표시돼요.</div>
         </div>
       </div>
@@ -608,7 +626,10 @@
         <div class="card side-card" id="actionCard">
           <h3>다음 액션</h3>
           <p style="font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin:0 0 14px;" id="actionText"></p>
-          <button class="btn btn-primary" style="width:100%;justify-content:center;" id="actionBtn"></button>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn btn-primary" style="width:100%;justify-content:center;" id="confirmBtn" onclick="goTo(5)">회의 확정하기 →</button>
+            <button class="btn btn-ghost" style="width:100%;justify-content:center;" id="reofferBtn" onclick="reoffer()">다음 후보로 재조율 →</button>
+          </div>
         </div>
       </div>
     </div>
@@ -669,14 +690,14 @@ const PEOPLE = [
 
 const PREF_DEFS = {
   'lunch':  { label:'점심 직후 회피 (13–14시)' },
-  'tue-out':{ label:'화요일 외근' },
+  'tue-out':{ label:'화요일 정기 외근' },
 };
 
 const CANDIDATES = [
   {
     day:'수요일', date:'7/15', time:'오전 10:00 – 11:00',
     score:98, rank:1,
-    reason:'<b>필수 참석자 전원 가능</b> · 선택 참석자 전원 선호 조건에 부합 · 최근 3주간 겹치는 외근·휴가 없음',
+    reason:'<b>필수 참석자 전원 가능</b> · 선택 참석자 전원 선호 조건에 부합 · 외근·휴가 없음',
     people:{ p1:'ok', p2:'ok', p3:'ok', p4:'ok', p5:'ok', p6:'excluded' }
   },
   {
@@ -688,7 +709,7 @@ const CANDIDATES = [
   {
     day:'목요일', date:'7/16', time:'오후 2:00 – 3:00',
     score:70, rank:3,
-    reason:'필수 참석자 전원 가능하지만 <b>박서연 · 정민준 점심 직후 선호 위반</b>',
+    reason:'<b>필수 참석자 전원 가능</b> · 박서연 정민준 <b>점심 직후 선호 위반</b>',
     people:{ p1:'ok', p2:'warn', p3:'ok', p4:'ok', p5:'warn', p6:'excluded' }
   },
 ];
@@ -696,7 +717,7 @@ const CANDIDATES = [
 const EXTRA_CANDIDATE = {
   day:'금요일', date:'7/17', time:'오전 11:00 – 12:00',
   score:64, rank:4,
-  reason:'필수 참석자 전원 가능 · 선택 참석자 2명 모두 선호 조건 부합하나 회의 밀도가 높은 요일',
+  reason:'필수 참석자 전원 가능 · 회의 밀도가 높은 요일',
   people:{ p1:'ok', p2:'ok', p3:'ok', p4:'ok', p5:'ok', p6:'excluded' }
 };
 
@@ -708,7 +729,7 @@ let state = {
   extraShown: false,
   responses: {}, // personId -> '가능' | '어려움' | '다른 시간 제안' | null
   countdownInterval: null,
-  countdownSeconds: 6*3600,
+  countdownSeconds: 30*60,
 };
 
 function initResponses(){
@@ -766,11 +787,10 @@ function renderRoster(){
   PEOPLE.forEach(p=>{
     const row = document.createElement('div');
     row.className = 'roster-row';
-    const prefChips = Object.keys(PREF_DEFS).map(key=>{
-      const on = p.prefs.includes(key);
-      return `<label class="pref-chip ${on?'on':''}" onclick="togglePref(event,'${p.id}','${key}')">
+    const prefChips = p.prefs.map(key=>{
+      return `<div class="pref-chip on">
         <span class="dot-ic"></span>${PREF_DEFS[key].label}
-      </label>`;
+      </div>`;
     }).join('');
 
     row.innerHTML = `
@@ -798,17 +818,12 @@ function setRole(id, role){
   p.role = role;
   renderRoster();
 }
-function togglePref(e, id, key){
-  e.preventDefault();
-  const p = PEOPLE.find(x=>x.id===id);
-  if(p.prefs.includes(key)) p.prefs = p.prefs.filter(k=>k!==key);
-  else p.prefs.push(key);
-  renderRoster();
-}
-
 /* ============ SCREEN 2: CANDIDATES ============ */
 function currentCandidateList(){
   return state.extraShown ? [...CANDIDATES, EXTRA_CANDIDATE] : CANDIDATES;
+}
+function formatReason(text){
+  return text.split(' · ').map(line=>`<div class="reason-line">${line}</div>`).join('');
 }
 function renderCandidates(){
   const grid = document.getElementById('candGrid');
@@ -847,7 +862,7 @@ function renderCandidates(){
       </div>
       <div class="cand-day">${c.day} <span style="color:var(--mute);font-weight:500;font-size:14px;">${c.date}</span></div>
       <div class="cand-time">${c.time}</div>
-      <div class="reason">${c.reason}</div>
+      <div class="reason">${formatReason(c.reason)}</div>
       <div class="avatars-row">${avatarsHtml}</div>
       <div class="consent-bar">
         <span style="width:${pct(okCount)};background:var(--ok)"></span>
@@ -875,10 +890,10 @@ function startCountdown(){
   const c = getSelectedCandidate();
   document.getElementById('s3-time').textContent = `${c.day} ${c.time}`;
   clearInterval(state.countdownInterval);
-  state.countdownSeconds = 6*3600;
+  state.countdownSeconds = 30*60;
   updateCountdownDisplay();
   state.countdownInterval = setInterval(()=>{
-    state.countdownSeconds -= 37; // accelerated for demo purposes
+    state.countdownSeconds -= 3; // accelerated for demo purposes
     if(state.countdownSeconds <= 0){
       state.countdownSeconds = 0;
       clearInterval(state.countdownInterval);
@@ -957,42 +972,26 @@ function renderDashboard(){
     <div class="stat-row"><span>${k}</span><span class="n">${v}명</span></div>
   `).join('');
 
-  // action card
+  // action card — confirm / reoffer are always shown together; the organizer decides based on the numbers
   const requiredAllOk = PEOPLE.filter(p=>p.role==='required').every(p=> state.responses[p.id] === '가능');
   const anyHardConflict = PEOPLE.filter(p=>p.role==='required').some(p=> state.responses[p.id] === '어려움' || state.responses[p.id] === '다른 시간 제안');
 
   const actionText = document.getElementById('actionText');
-  const actionBtn = document.getElementById('actionBtn');
 
   if(requiredAllOk){
-    actionText.textContent = '필수 참석자 전원이 가능하다고 응답했어요. 지금 바로 회의를 확정할 수 있어요.';
-    actionBtn.textContent = '회의 확정하기 →';
-    actionBtn.className = 'btn btn-primary';
-    actionBtn.style.width = '100%'; actionBtn.style.justifyContent='center';
-    actionBtn.onclick = ()=> goTo(5);
+    actionText.textContent = '필수 참석자 전원이 가능하다고 응답했어요. 바로 확정하거나, 선택 참석자 참여를 더 높이고 싶다면 다음 후보로 재조율할 수도 있어요.';
   } else if(anyHardConflict){
-    actionText.textContent = '필수 참석자 중 일부가 이 시간이 어렵다고 답했어요. 다음 순위 후보로 재조율해보세요.';
-    actionBtn.textContent = '다음 후보로 재조율 →';
-    actionBtn.className = 'btn btn-primary';
-    actionBtn.style.width = '100%'; actionBtn.style.justifyContent='center';
-    actionBtn.onclick = ()=>{
-      state.extraShown = true;
-      state.selectedCandidateIdx = null;
-      goTo(2);
-      document.getElementById('sendReqBtn').disabled = true;
-    };
+    actionText.textContent = '필수 참석자 중 일부가 이 시간이 어렵다고 답했어요. 그래도 확정하거나, 다음 순위 후보로 재조율할 수 있어요 — 최종 판단은 주최자 몫이에요.';
   } else {
-    actionText.textContent = '아직 응답을 기다리는 중이에요. 마감 전까지 조금 더 지켜볼까요?';
-    actionBtn.textContent = '리마인드 보내기';
-    actionBtn.className = 'btn btn-ghost';
-    actionBtn.style.width = '100%'; actionBtn.style.justifyContent='center';
-    actionBtn.onclick = ()=>{
-      // simulate remaining people responding for demo flow
-      state.responses['p5'] = '가능';
-      if(state.responses['p2']==null) state.responses['p2']='가능';
-      renderDashboard();
-    };
+    actionText.textContent = '아직 일부 응답을 기다리는 중이에요. 지금 확정하거나, 더 나은 후보로 재조율할 수 있어요.';
   }
+}
+
+function reoffer(){
+  state.extraShown = true;
+  state.selectedCandidateIdx = null;
+  goTo(2);
+  document.getElementById('sendReqBtn').disabled = true;
 }
 
 /* ============ SCREEN 5: FINAL ============ */
@@ -1035,7 +1034,7 @@ function resetAll(){
   PEOPLE[3].role='optional'; PEOPLE[4].role='optional'; PEOPLE[5].role='out';
   PEOPLE[1].prefs=['lunch']; PEOPLE[3].prefs=['tue-out']; PEOPLE[4].prefs=['lunch'];
   PEOPLE[0].prefs=[]; PEOPLE[2].prefs=[]; PEOPLE[5].prefs=[];
-  state = { step:1, maxStepReached:1, selectedCandidateIdx:null, extraShown:false, responses:{}, countdownInterval:null, countdownSeconds:6*3600 };
+  state = { step:1, maxStepReached:1, selectedCandidateIdx:null, extraShown:false, responses:{}, countdownInterval:null, countdownSeconds:30*60 };
   initResponses();
   goTo(1);
 }
